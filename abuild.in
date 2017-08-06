@@ -1,4 +1,4 @@
-#!/bin/ash -e
+#!/bin/bash -e
 
 # abuild - build apk packages (light version of makepkg)
 # Copyright (c) 2008-2015 Natanael Copa <ncopa@alpinelinux.org>
@@ -21,8 +21,8 @@ fi
 
 # defaults
 : ${FAKEROOT:="fakeroot"}
-: ${SUDO_APK:="abuild-apk"}
-: ${APK:="apk"}
+: ${SUDO_APK:="abuild-spk"}
+: ${APK:="spk"}
 : ${ADDUSER:="abuild-adduser"}
 : ${ADDGROUP:="abuild-addgroup"}
 
@@ -487,7 +487,7 @@ cleanpkg() {
 	rm -f "$REPODEST/$repo/src/$pkgname-$pkgver-r$pkgrel.src.tar.gz"
 	for i in $allpackages; do
 		subpkg_set "$i"
-		rm -f "$REPODEST/$repo/${subpkgarch/noarch/$CARCH}/$subpkgname-$pkgver-r$pkgrel.apk"
+		rm -f "$REPODEST/$repo/${subpkgarch/noarch/$CARCH}/$subpkgname-$pkgver-r$pkgrel.spk"
 	done
 	subpkg_unset
 
@@ -502,8 +502,8 @@ cleanoldpkg() {
 	msg "Cleaning all packages except $pkgver-r$pkgrel..."
 	for i in $allpackages; do
 		subpkg_set "$i"
-		for j in "$REPODEST"/$repo/*/$subpkgname-[0-9]*.apk ; do
-			[ "${j##*/}" = "$subpkgname-$pkgver-r$pkgrel.apk" ] \
+		for j in "$REPODEST"/$repo/*/$subpkgname-[0-9]*.spk ; do
+			[ "${j##*/}" = "$subpkgname-$pkgver-r$pkgrel.spk" ] \
 				&& continue
 			rm -f "$j"
 		done
@@ -518,7 +518,7 @@ mkusers() {
 	for i in $pkggroups; do
 		if ! getent group $i >/dev/null; then
 			msg "Creating group $i"
-			$ADDGROUP -S $i || return 1
+			$ADDGROUP --system $i || return 1
 		fi
 	done
 	for i in $pkgusers; do
@@ -526,9 +526,9 @@ mkusers() {
 			local gopt=
 			msg "Creating user $i"
 			if getent group $i >/dev/null; then
-				gopt="-G $i"
+				gopt="--ingroup $i"
 			fi
-			$ADDUSER -S -D -H $gopt $i || return 1
+			$ADDUSER --system --disabled-login --no-create-home $gopt $i || return 1
 		fi
 	done
 }
@@ -828,7 +828,7 @@ prepare_metafiles() {
 	local name=${subpkgname:-$pkgname}
 	[ -z "${name##* *}" ] && die "package name contains spaces"
 	local dir=${subpkgdir:-$pkgdir}
-	local pkg="$name-$pkgver-r$pkgrel.apk"
+	local pkg="$name-$pkgver-r$pkgrel.spk"
 	local pkginfo="$controldir"/.PKGINFO
 	local sub
 
@@ -870,13 +870,13 @@ prepare_metafiles() {
 	EOF
 	local i deps
 	deps="$depends"
-	if [ "$pkgname" != "busybox" ] && ! depends_has busybox; then
+	if [ "$pkgname" != "bash" ] && ! depends_has bash; then
 		for i in $install $triggers; do
 			local s=${i%=*}
 			[ "$name" != "${s%.*}" ] && continue
 			if head -n 1 "$startdir/$s" | grep '^#!/bin/sh' >/dev/null ; then
-				msg "Script found. busybox added as a dependency for $pkg"
-				deps="$deps busybox"
+				msg "Script found. bash added as a dependency for $pkg"
+				deps="$deps bash"
 				break
 			fi
 		done
@@ -1359,7 +1359,7 @@ create_apks() {
 		local name=$(pkginfo_val pkgname $file)
 		local ver=$(pkginfo_val pkgver $file)
 		local size=$(pkginfo_val size $file | human_size)
-		local apk=$name-$ver.apk
+		local apk=$name-$ver.spk
 		local datadir="$pkgbasedir"/$name
 		local subpkgname=$name
 		local subpkgarch=$(pkginfo_val arch $file)
@@ -1439,22 +1439,22 @@ update_abuildrepo_index() {
 
 	for i in $allarch; do
 		cd "$REPODEST/$repo/$i"
-		local index=$i/APKINDEX.tar.gz
+		local index=$i/SPKINDEX.tar.gz
 
 		msg "Updating the $repo/$i repository index..."
 		local sign=".SIGN.RSA.${SIGN_PUBLIC_KEY##*/}"
 		local oldindex=
-		if [ -f APKINDEX.tar.gz ]; then
-			oldindex="--index APKINDEX.tar.gz"
+		if [ -f SPKINDEX.tar.gz ]; then
+			oldindex="--index SPKINDEX.tar.gz"
 		fi
-		( $APK index --quiet $oldindex --output APKINDEX.tar.gz.$$ \
+		( $APK index --quiet $oldindex --output SPKINDEX.tar.gz.$$ \
 			--description "$repo $(cd $startdir && git describe)" \
-			--rewrite-arch $i *.apk && \
+			--rewrite-arch $i *.spk && \
 		  msg "Signing the index..." && \
-		  abuild-sign -q APKINDEX.tar.gz.$$ && \
-		  chmod 644 APKINDEX.tar.gz.$$ && \
-		  mv APKINDEX.tar.gz.$$ APKINDEX.tar.gz \
-		) || (rm -f APKINDEX.tar.gz.$$ ; die "Failed to create index")
+		  abuild-sign -q SPKINDEX.tar.gz.$$ && \
+		  chmod 644 SPKINDEX.tar.gz.$$ && \
+		  mv SPKINDEX.tar.gz.$$ SPKINDEX.tar.gz \
+		) || (rm -f SPKINDEX.tar.gz.$$ ; die "Failed to create index")
 	done
 }
 
@@ -1704,7 +1704,7 @@ apk_up2date() {
 	local i s
 	for i in $allpackages; do
 		subpkg_set "$i"
-		if [ ! -f "$REPODEST/$repo/${subpkgarch/noarch/$CARCH}/$subpkgname-$pkgver-r$pkgrel.apk" ]; then
+		if [ ! -f "$REPODEST/$repo/${subpkgarch/noarch/$CARCH}/$subpkgname-$pkgver-r$pkgrel.spk" ]; then
 			subpkg_unset
 			return 1
 		fi
@@ -1719,7 +1719,7 @@ apk_up2date() {
 		else
 			s="$startdir/${i##*/}"
 		fi
-		if [ "$s" -nt "$REPODEST/$repo/${pkgarch/noarch/$CARCH}/$pkgname-$pkgver-r$pkgrel.apk" ]; then
+		if [ "$s" -nt "$REPODEST/$repo/${pkgarch/noarch/$CARCH}/$pkgname-$pkgver-r$pkgrel.spk" ]; then
 			return 1
 		fi
 	done
@@ -1733,10 +1733,10 @@ abuildindex_up2date() {
 	for i in $allpackages; do
 		subpkg_set "$i"
 		local dir="$REPODEST"/$repo/${subpkgarch/noarch/$CARCH}
-		local idx="$dir"/APKINDEX.tar.gz
-		local file="$dir"/$subpkgname-$pkgver-r$pkgrel.apk
+		local idx="$dir"/SPKINDEX.tar.gz
+		local file="$dir"/$subpkgname-$pkgver-r$pkgrel.spk
 
-		# if any file is missing or .apk is newer then index
+		# if any file is missing or .spk is newer then index
 		# the index needs to be updated
 		if [ ! -f "$idx" -o ! -f "$file" -o "$file" -nt "$idx" ]; then
 			subpkg_unset
@@ -2018,7 +2018,7 @@ listpkg() {
 	getpkgver || return 1
 	for name in $allpackages ; do
 		subpkg_set $name
-		echo "$subpkgname-$pkgver-r$pkgrel.apk"
+		echo "$subpkgname-$pkgver-r$pkgrel.spk"
 	done
 	subpkg_unset
 }

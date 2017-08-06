@@ -23,10 +23,10 @@
 
 static const char* valid_cmds[] = {
 	"/bin/adduser",
-	"/usr/sbin/adduser",
+	"/usr/bin/adduser",
 	"/bin/addgroup",
-	"/usr/sbin/addgroup",
-	"/sbin/apk",
+	"/usr/bin/addgroup",
+	"/sbin/spk",
 	NULL
 };
 
